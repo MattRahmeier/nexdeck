@@ -703,6 +703,15 @@ public class Worker {
     return false;
   }
 
+  // fecha o app aberto e volta ao NEXDECK (OPENAPP sem nome: o lançador não abre nada)
+  public void ReturnToLauncher() {
+    Request(() => {
+      if (link.Mode != BoardMode.App) return;
+      Must(link.Send("OPENAPP	"));
+      link.Close();  // a placa reinicia no NEXDECK
+    });
+  }
+
   public void OpenApp(string name) {
     Request(() => {
       if (link.Mode == BoardMode.Launcher) link.LauncherRun(name);

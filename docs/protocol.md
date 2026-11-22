@@ -55,6 +55,7 @@ An app decides what `kind`/`arg` mean (e.g. `B\tPHOTO\t0\t<len>` = a 480×480 JP
 | `FPUT\t<path>\t<bytes>` | receives a file in blocks to `<path>.tmp`, renames to `<path>`, `DONE` |
 | `RM\t<path>` | deletes a file: `K` or `ERR` |
 | `OPENAPP\t<id>` | `K`, then returns to the launcher, which opens `<id>` immediately |
+| `OPENAPP\t` (no id) | `K`, then returns to the launcher and stays there (the HUB's stop button) |
 
 Paths must start with `/` and cannot contain `..`.
 

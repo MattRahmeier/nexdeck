@@ -203,6 +203,9 @@ public static class Glyphs {
         case "play":
           g.FillPolygon(br, new[] { P(.32f, .2f), P(.32f, .8f), P(.8f, .5f) });
           break;
+        case "stop":
+          Theme.FillRound(g, c, new RectangleF(P(.26f, .26f), new SizeF(s * .48f, s * .48f)), s * .09f);
+          break;
         case "close":
           g.DrawLine(pen, P(.28f, .28f), P(.72f, .72f));
           g.DrawLine(pen, P(.72f, .28f), P(.28f, .72f));
@@ -1017,11 +1020,18 @@ public class HubForm : Form {
         // app com configurações: abre a página dele; sem configurações: pergunta se abre na placa
         if (card.Configurable) card.Activated += () => ShowApp(module);
         else card.Activated += () => { if (worker.Mode != BoardMode.None && Ask.YesNo(this, "Deseja abrir esse app na placa?", card.Picture)) worker.OpenApp(name); };
-        if (card.Configurable && card.Running) {
-          card.Action.Glyph = "gear";
-          card.Action.Primary = true;
-          card.Action.Click += (s, e) => ShowApp(module);
-          card.Action.Visible = true;
+        if (card.Running) {  // aberto agora: configurações (se tiver) e parar (volta ao NEXDECK da placa)
+          var stop = card.Configurable ? card.Settings : card.Action;
+          stop.Glyph = "stop";
+          stop.Click += (s, e) => { if (Ask.YesNo(this, "Fechar " + Theme.AppLabel(name) + " e voltar ao NEXDECK na placa?", card.Picture)) worker.ReturnToLauncher(); };
+          stop.Visible = true;
+          new ToolTip().SetToolTip(stop, "Fechar e voltar ao NEXDECK");
+          if (card.Configurable) {
+            card.Action.Glyph = "gear";
+            card.Action.Primary = true;
+            card.Action.Click += (s, e) => ShowApp(module);
+            card.Action.Visible = true;
+          }
         } else {
           card.Action.Glyph = "play";
           card.Action.Click += (s, e) => worker.OpenApp(name);
