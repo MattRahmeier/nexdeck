@@ -238,6 +238,8 @@ public class FlatButton : Control {
   protected override void OnMouseDown(MouseEventArgs e) { down = true; Invalidate(); base.OnMouseDown(e); }
   protected override void OnMouseUp(MouseEventArgs e) { down = false; Invalidate(); base.OnMouseUp(e); }
   protected override void OnEnabledChanged(EventArgs e) { Invalidate(); base.OnEnabledChanged(e); }
+  // um rótulo vizinho com caixa mais larga que o texto não pode cobrir o canto do botão
+  protected override void OnParentChanged(EventArgs e) { base.OnParentChanged(e); if (Parent != null) BringToFront(); }
   protected override void OnPaint(PaintEventArgs e) {
     var g = e.Graphics;
     Theme.Hq(g);
