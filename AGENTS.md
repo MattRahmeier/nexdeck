@@ -50,7 +50,10 @@ python -I tools/make_nexapp.py path/to/my_app my_app "My App" 1.0   # → dist/m
 ```
 ```powershell
 powershell -ExecutionPolicy Bypass -File hub\build.ps1 [-Apps <modules dir>] [-Icons <png dir>] [-Resources <files>] [-Out <exe>]
+powershell -ExecutionPolicy Bypass -File hub\build-module.ps1 -Src <module .cs> -Out dist\my_app.dll   # PC side as a .dll
+python -I tools/make_nexapp.py path/to/my_app my_app "My App" 1.0 --pc dist/my_app.dll   # HUBs load it from the SD card
 hub\NEXDECKHub.exe --shots C:\temp\shots           # render the HUB pages to PNG
+# installer: the same exe named "Instalar NEXDECK HUB.exe" installs itself (no admin) and opens the HUB
 ```
 
 ## Definition of done for a new app

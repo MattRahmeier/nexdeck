@@ -69,6 +69,9 @@ public static class Theme {
       if (File.Exists(f)) using (var b = new Bitmap(f)) return new Bitmap(b);
       using (var s = Assembly.GetExecutingAssembly().GetManifestResourceStream("app." + name + ".png"))
         if (s != null) return new Bitmap(s);
+      foreach (var asm in HubApps.All.Select(a => a.GetType().Assembly).Distinct())  // ícone dentro do módulo .dll
+        using (var s = asm.GetManifestResourceStream("app." + name + ".png"))
+          if (s != null) return new Bitmap(s);
     } catch { }
     return null;
   }
@@ -1163,6 +1166,18 @@ public class TrayApp : ApplicationContext {
     Application.Exit();
   }
 
+  // abre o HUB de novo (versão nova de um módulo que já estava carregado); a cópia nova espera esta fechar
+  public void Restart() {
+    bool showWin = win != null && !win.IsDisposed && win.Visible;
+    Log.Write("reiniciando o HUB");
+    Guard.SetFlag("sair", true);  // o vigia não reabre por conta própria
+    try { Guard.StartDetached(showWin ? "--reiniciar-janela" : "--reiniciar"); } catch (Exception e) { Log.Write("reiniciar: " + e.Message); return; }
+    worker.Stop = true;
+    tray.Visible = false;
+    if (win != null && !win.IsDisposed) win.Close();
+    Application.Exit();
+  }
+
   public void SetPaused(bool p) {
     worker.Paused = p;
     pauseItem.Checked = p;
@@ -1205,8 +1220,9 @@ public class TrayApp : ApplicationContext {
     });
     var signal = new EventWaitHandle(false, EventResetMode.AutoReset, "NEXDECKHub.Open");
     new Thread(() => { while (signal.WaitOne()) OnUi(OpenWindow); }) { IsBackground = true, Name = "abrir" }.Start();
+    worker.RestartNeeded += () => OnUi(Restart);
     worker.Start();
-    if (reason == "") OnUi(OpenWindow);  // aberto pelo usuário: mostra os apps da placa
+    if (reason == "" || reason == "--reiniciar-janela" || reason == "--instalado") OnUi(OpenWindow);  // aberto pelo usuário: mostra os apps da placa
   }
 
   void OpenWindow() {

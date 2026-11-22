@@ -54,10 +54,13 @@ An app decides what `kind`/`arg` mean (e.g. `B\tPHOTO\t0\t<len>` = a 480×480 JP
 | `LS` | `EV\tAPPS\t<id>,<bytes>;<id>,<bytes>...` (from `/apps/*.bin`), then `K` |
 | `FPUT\t<path>\t<bytes>` | receives a file in blocks to `<path>.tmp`, renames to `<path>`, `DONE` |
 | `RM\t<path>` | deletes a file: `K` or `ERR` |
+| `LSF\t<dir>\t<.ext>` | `EV\tFILES\t<dir>\t<name>,<bytes>,<crc32 hex>;...`, then `K` |
+| `FGET\t<path>` | `OK\t<bytes>`, then board→PC blocks (up to 2048 bytes + 2-byte sum); the PC answers each with one byte, `K` (next) or `R` (again); `DONE` at the end |
 | `OPENAPP\t<id>` | `K`, then returns to the launcher, which opens `<id>` immediately |
 | `OPENAPP\t` (no id) | `K`, then returns to the launcher and stays there (the HUB's stop button) |
 
-Paths must start with `/` and cannot contain `..`.
+Paths must start with `/` and cannot contain `..`. The CRC-32 is the zip/zlib one. The HUB uses `LSF`/`FGET`
+(`LSF`/`GET` in the launcher) to copy `/apps/*.dll` (PC modules) and `/apps/*.icn` from the card.
 
 ### Conventions
 
@@ -76,6 +79,8 @@ Paths must start with `/` and cannot contain `..`.
 | `PUT <path> <bytes>` | `OK`, then the PC sends 4096-byte blocks, each answered `K`; finally `DONE <bytes>` |
 | `RUN <id>` | installs if needed and opens the app (like a tap) |
 | `RM <path>` | `OK` or `ERR ...` |
+| `LSF <dir> <.ext>` | one line per file: `<name> <bytes> <crc32 hex>`, then `END` |
+| `GET <path>` | `OK <bytes>`, then the same board→PC blocks as `FGET` |
 
 `tools/push.ps1` speaks this dialect (`-File/-Dest`, `-Run`, `-Remove`, `-List`). The CH340 sometimes drops
 bytes at 921600: `push.ps1` retries a whole file if a block fails.

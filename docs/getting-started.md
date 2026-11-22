@@ -73,6 +73,15 @@ powershell -ExecutionPolicy Bypass -File hub\build.ps1 -Apps C:\my\hub-apps -Ico
 ```
 
 Each module is a class that extends `HubApp`; register it in a `partial class HubApps` (see hub-modules.md).
+Or ship each module as a .dll inside its `.nexapp` (`hub\build-module.ps1`): then the stock HUB loads it from
+the SD card and nobody needs a custom build.
+
+### Installing on another PC
+
+Rename (or copy) `NEXDECKHub.exe` to `Instalar NEXDECK HUB.exe` and run it: it installs itself in
+`%LOCALAPPDATA%\Programs\NEXDECK HUB` (no admin), adds a Start menu shortcut and an entry in Windows'
+installed apps (uninstall runs `NEXDECKHub.exe --desinstalar`), and opens the HUB. Connect the board: the PC
+side of every app on the card is copied automatically.
 
 ## Tips
 

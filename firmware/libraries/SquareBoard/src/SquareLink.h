@@ -5,6 +5,8 @@
 // Comandos de cartão que todo app atende (o HUB usa para listar e instalar apps):
 //   LS → EV APPS nome,bytes;...   FPUT\t<caminho>\t<bytes> → OK, blocos, DONE   RM\t<caminho>
 //   OPENAPP\t<nome> → volta ao NEXLauncher, que abre o app na hora
+//   LSF\t<pasta>\t<.ext> → EV FILES <pasta> nome,bytes,crc32;...   (o HUB acha os módulos .dll e ícones .icn)
+//   FGET\t<caminho> → OK\t<bytes>, blocos placa→PC (2048 + soma; o PC responde K ou R), DONE
 #include <Arduino.h>
 #include <Preferences.h>
 #include <SD.h>
@@ -87,6 +89,76 @@ inline void listApps() {
   Serial.println(out);
 }
 
+// CRC-32 (o mesmo do zip/zlib), para o HUB saber se o arquivo do cartão mudou
+inline uint32_t crc32(uint32_t crc, const uint8_t* d, size_t n) {
+  static uint32_t table[256];
+  if (!table[1])
+    for (uint32_t i = 0; i < 256; i++) {
+      uint32_t c = i;
+      for (int k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320u ^ (c >> 1) : c >> 1;
+      table[i] = c;
+    }
+  crc = ~crc;
+  while (n--) crc = table[(crc ^ *d++) & 255] ^ (crc >> 8);
+  return ~crc;
+}
+
+inline uint32_t fileCrc(File& f) {
+  static uint8_t buf[2048];
+  uint32_t crc = 0;
+  f.seek(0);
+  for (int n; (n = f.read(buf, sizeof buf)) > 0;) crc = crc32(crc, buf, n);
+  return crc;
+}
+
+inline bool safePath(const char* p) { return p[0] == '/' && !strstr(p, ".."); }
+
+// arquivos de uma pasta com a extensão pedida: "nome,bytes,crc;..." (vai para out)
+inline void listFiles(const char* dirPath, const char* ext, String& out) {
+  File dir = SD.open(dirPath);
+  bool first = true;
+  size_t el = strlen(ext);
+  if (dir && dir.isDirectory())
+    for (File f = dir.openNextFile(); f; f = dir.openNextFile()) {
+      String n = f.name();
+      if (!f.isDirectory() && n[0] != '.' && n.length() > el && n.endsWith(ext)) {
+        if (!first) out += ";";
+        char tail[32];
+        snprintf(tail, sizeof tail, ",%u,%08lx", (unsigned)f.size(), (unsigned long)fileCrc(f));
+        out += n + tail;
+        first = false;
+      }
+      f.close();
+    }
+}
+
+// manda um arquivo do cartão para o PC: "OK\t<bytes>" (ok = prefixo), blocos de até 2048 bytes + soma de
+// 2 bytes; o PC responde K (próximo) ou R (de novo); "DONE" no fim
+inline void sendFile(const char* path, const char* ok) {
+  File f = safePath(path) ? SD.open(path) : File();
+  if (!f || f.isDirectory()) { Serial.println("ERR abrir"); return; }
+  uint32_t len = f.size(), off = 0;
+  Serial.printf("%s%u\n", ok, (unsigned)len);
+  static uint8_t chunk[CHUNK + 2];
+  int fails = 0;
+  while (off < len) {
+    size_t n = len - off < (uint32_t)CHUNK ? len - off : CHUNK;
+    f.seek(off);
+    if (f.read(chunk, n) != (int)n) { Serial.println("ERR ler"); f.close(); return; }
+    uint16_t sum = 0;
+    for (size_t i = 0; i < n; i++) sum += chunk[i];
+    chunk[n] = sum & 255;
+    chunk[n + 1] = sum >> 8;
+    Serial.write(chunk, n + 2);
+    int a = -1;
+    for (uint32_t t = millis(); millis() - t < 3000 && a != 'K' && a != 'R';) a = Serial.available() ? Serial.read() : -1;
+    if (a == 'K') { off += n; fails = 0; continue; }
+    if (a != 'R' || ++fails > 8) { f.close(); return; }  // o PC desistiu
+  }
+  f.close();
+  Serial.println("DONE");
+}
+
 inline void receiveFile(const char* path, uint32_t len) {
   if (path[0] != '/' || strstr(path, "..")) { Serial.println("ERR caminho"); return; }
   {  // cria a pasta do arquivo (um nível), ex.: /apps/x.bin → /apps
@@ -116,6 +188,21 @@ bool common(char* s, bool sdOk, F beforeLeave) {
     char path[64];
     unsigned len = 0;
     if (sdOk && sscanf(s + 5, "%63[^\t]\t%u", path, &len) == 2 && len > 0) receiveFile(path, len);
+    else Serial.println("ERR");
+    return true;
+  }
+  if (!strncmp(s, "LSF\t", 4)) {
+    char dir[48], ext[12] = "";
+    if (sdOk && sscanf(s + 4, "%47[^\t]\t%11s", dir, ext) >= 1 && safePath(dir)) {
+      String out = String("EV\tFILES\t") + dir + "\t";
+      listFiles(dir, ext, out);
+      Serial.println(out);
+    }
+    Serial.println("K");
+    return true;
+  }
+  if (!strncmp(s, "FGET\t", 5)) {
+    if (sdOk) sendFile(s + 5, "OK\t");
     else Serial.println("ERR");
     return true;
   }

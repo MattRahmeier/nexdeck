@@ -9,6 +9,8 @@
 //   LS                     → lista /apps
 //   RUN <nome>             → instala (se precisar) e abre o app, como um toque
 //   RM <caminho>           → apaga um arquivo do cartão (OK ou ERR)
+//   LSF <pasta> <.ext>     → "nome bytes crc32" por linha, END no fim (o HUB acha módulos .dll e ícones .icn)
+//   GET <caminho>          → OK <bytes>, blocos placa→PC de 2048 + soma (o PC responde K ou R), DONE
 // O script tools/push.ps1 faz isso do PC.
 #include <Arduino.h>
 #include <Preferences.h>
@@ -18,6 +20,7 @@
 #include <math.h>
 #include <SquareBoard.h>
 #include <SquareLauncher.h>
+#include <SquareLink.h>
 
 namespace {
 
@@ -345,6 +348,24 @@ void handleCommand(char* line) {
     bool ok = sdOk && line[3] == '/' && SD.remove(line + 3);
     Serial.println(ok ? "OK" : "ERR nao apagou");
     if (ok) { scanApps(); if (!welcome) drawMenu(); }
+  } else if (strncmp(line, "LSF ", 4) == 0) {
+    char dir[48], ext[12] = "";
+    if (sdOk && sscanf(line + 4, "%47s %11s", dir, ext) >= 1 && sqlink::safePath(dir)) {
+      String out;
+      sqlink::listFiles(dir, ext, out);
+      for (int a = 0; a < (int)out.length();) {  // "n,b,c;n,b,c" → uma linha "n b c" por arquivo
+        int e = out.indexOf(';', a);
+        if (e < 0) e = out.length();
+        String item = out.substring(a, e);
+        item.replace(',', ' ');
+        Serial.println(item);
+        a = e + 1;
+      }
+    }
+    Serial.println("END");
+  } else if (strncmp(line, "GET ", 4) == 0) {
+    if (sdOk) sqlink::sendFile(line + 4, "OK ");
+    else Serial.println("ERR sem cartao");
   } else if (strncmp(line, "RUN ", 4) == 0) {
     for (int i = 0; i < appCount; i++)
       if (strcmp(apps[i].name, line + 4) == 0) { launch(apps[i]); return; }

@@ -46,11 +46,28 @@ W.RunningApp == Id                                         // is my app open on 
 
 - Simple values: `Cfg.Get(Id, "key", "default")`, `Cfg.Set(Id, "key", value)` (saved in `config.json` when the
   page's *Salvar* runs, or call `Cfg.Save()`).
-- Typed fields: add them to `public partial class Config { ... }` in your module file; set defaults in
-  `partial void Defaults()` (one implementation per build).
+- Typed settings: a class of your own, `Cfg.GetObj<MySettings>(Id)` / `Cfg.SetObj(Id, obj)` (stored as JSON in
+  `config.json`; works from a module .dll). A `partial class Config` also works, but only for modules compiled
+  into the HUB with `-Apps`.
 - Your own files: `Path.Combine(Config.Dir, "my_app")`.
 
-### Registering modules
+### Module .dll (recommended): the PC side travels with the app
+
+Build the module on its own against a HUB .exe, and put it in the `.nexapp`:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File hub\build-module.ps1 -Src C:\my\hub-apps\MyApp.cs -Icons C:\my\icons\my_app.png -Out dist\my_app.dll
+python -I tools/make_nexapp.py path/to/my_app my_app "My App" 1.0 --pc dist/my_app.dll
+```
+
+Installing the package writes `/apps/my_app.dll` to the SD card. Any NEXDECK HUB that sees the card (launcher or
+an app open) lists `/apps/*.dll` with `LSF`, copies new or changed ones to `%APPDATA%\NEXDECK HUB\modulos` with
+`FGET`/`GET` and loads them: public, non-abstract `HubApp` classes with a parameterless constructor. A new
+module starts right away; a new version of a loaded one restarts the HUB. Card icons (`/apps/*.icn`) are copied
+the same way, so a new PC only needs the HUB installer (`Instalar NEXDECK HUB.exe`) and the card.
+Inside a module .dll, `Assembly.GetExecutingAssembly()` is the .dll, so `-Resources` files go with it.
+
+### Registering modules compiled into the HUB
 
 ```csharp
 public static partial class HubApps {

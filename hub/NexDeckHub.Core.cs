@@ -48,7 +48,11 @@ public partial class Config {
     Config c = null;
     try {
       BeforeLoad();
-      if (File.Exists(FilePath)) c = new JavaScriptSerializer().Deserialize<Config>(File.ReadAllText(FilePath));
+      if (File.Exists(FilePath)) {
+        string text = File.ReadAllText(FilePath);
+        c = new JavaScriptSerializer().Deserialize<Config>(text);
+        try { c.Raw = new JavaScriptSerializer().Deserialize<Dictionary<string, object>>(text); } catch { }
+      }
     } catch { }
     if (c == null) c = new Config();
     if (c.Port == null) c.Port = "";
@@ -59,7 +63,14 @@ public partial class Config {
 
   public void Save() {
     Directory.CreateDirectory(Dir);
-    File.WriteAllText(FilePath, new JavaScriptSerializer().Serialize(this));
+    var ser = new JavaScriptSerializer();
+    string json = ser.Serialize(this);
+    if (Raw != null && Raw.Count > 0) {  // mantém campos que esta versão não conhece (módulo que ainda vai chegar do cartão)
+      var d = ser.Deserialize<Dictionary<string, object>>(json);
+      foreach (var kv in Raw) if (!d.ContainsKey(kv.Key)) d[kv.Key] = kv.Value;
+      json = ser.Serialize(d);
+    }
+    File.WriteAllText(FilePath, json);
   }
 
   public string Get(string app, string key, string def) {
@@ -70,6 +81,20 @@ public partial class Config {
     if (AppData == null) AppData = new Dictionary<string, string>();
     AppData[app + "." + key] = value;
   }
+
+  // config.json como veio do disco (para módulos migrarem campos de versões antigas)
+  [ScriptIgnore] public Dictionary<string, object> Raw { get; set; }
+
+  // configuração de um módulo como objeto (guardada em AppData["app.json"]); na primeira vez, os campos de
+  // mesmo nome que versões antigas guardavam soltos no config.json
+  public T GetObj<T>(string app) where T : class, new() {
+    var ser = new JavaScriptSerializer();
+    string j = Get(app, "json", null);
+    if (j != null) try { return ser.Deserialize<T>(j); } catch { }
+    if (Raw != null) try { return ser.ConvertToType<T>(Raw); } catch { }
+    return new T();
+  }
+  public void SetObj(string app, object o) { Set(app, "json", new JavaScriptSerializer().Serialize(o)); }
 }
 
 // programas do menu Iniciar (mesma lista do Get-StartApps), útil para módulos com atalhos
@@ -248,6 +273,105 @@ public class Link {
     string done = ReadLine(8000);
     while (done != null && !done.StartsWith("DONE")) done = ReadLine(8000);
     return done != null;
+  }
+
+  // ---- arquivos do cartão (NEXLauncher: LSF/GET; apps com SquareLink: LSF/FGET)
+  public class CardFile { public string Name; public long Size; public uint Crc; }
+
+  // arquivos de uma pasta com a extensão pedida (".dll"); null = a placa não entende o comando
+  public List<CardFile> ListFiles(string dir, string ext) {
+    var list = new List<CardFile>();
+    Func<string, string, string, bool> add = (n, b, c) => {
+      long size;
+      uint crc;
+      if (!long.TryParse(b, out size) || !uint.TryParse(c, NumberStyles.HexNumber, null, out crc)) return false;
+      list.Add(new CardFile { Name = n, Size = size, Crc = crc });
+      return true;
+    };
+    if (Mode == BoardMode.Launcher) {
+      sp.Write("LSF " + dir + " " + ext + "\n");
+      for (string l = ReadLine(6000); l != null; l = ReadLine(6000)) {
+        if (l == "END") return list;
+        var f = l.Split(' ');
+        if (f.Length != 3 || !add(f[0], f[1], f[2])) return null;  // lançador antigo (sem LSF)
+      }
+      return null;
+    }
+    if (Mode != BoardMode.App) return null;
+    int before = Events.Count;
+    if (!Send("LSF\t" + dir + "\t" + ext, 6000)) return null;
+    Poll(20);
+    string ev = Events.Skip(before).LastOrDefault(e => e.StartsWith("EV\tFILES\t"));
+    if (ev == null) return null;  // app antigo: responde K mas não lista
+    var keep = Events.Where(e => !e.StartsWith("EV\tFILES\t")).ToList();
+    Events.Clear();
+    foreach (var e in keep) Events.Enqueue(e);
+    var p = ev.Split('\t');
+    if (p.Length > 3)
+      foreach (string item in p[3].Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries)) {
+        var f = item.Split(',');
+        if (f.Length == 3) add(f[0], f[1], f[2]);
+      }
+    return list;
+  }
+
+  // lê um arquivo do cartão; null = não deu (ou a placa não entende o comando)
+  public byte[] GetFile(string path, Action<int> progress) {
+    if (Mode == BoardMode.Launcher) sp.Write("GET " + path + "\n");
+    else if (Mode == BoardMode.App) { byte[] head = Encoding.UTF8.GetBytes(WithSum("FGET\t" + path)); sp.Write(head, 0, head.Length); }
+    else return null;
+    string r = ReadLine(4000);
+    while (r != null && !r.StartsWith("OK") && r != "K" && r != "E" && !r.StartsWith("ERR")) r = ReadLine(4000);
+    if (r == null || !r.StartsWith("OK")) return null;  // K = app antigo, que não tem FGET
+    int len;
+    if (!int.TryParse(r.Substring(3).Trim(), out len) || len < 0) return null;
+    var data = new byte[len];
+    int off = 0, fails = 0;
+    while (off < len) {
+      int n = Math.Min(2048, len - off);
+      byte[] chunk = ReadExact(n + 2, 3000);
+      bool ok = chunk != null;
+      if (ok) {
+        int sum = 0;
+        for (int i = 0; i < n; i++) sum = (sum + chunk[i]) & 0xFFFF;
+        ok = sum == (chunk[n] | (chunk[n + 1] << 8));
+      }
+      if (!ok) {
+        if (chunk == null || ++fails > 8) { Log.Write("ler " + path + ": desisti em " + off); Thread.Sleep(3200); sp.DiscardInBuffer(); rx.Clear(); return null; }
+        Thread.Sleep(30);
+        sp.DiscardInBuffer();
+        rx.Clear();
+        sp.Write("R");
+        continue;
+      }
+      System.Buffer.BlockCopy(chunk, 0, data, off, n);
+      off += n;
+      sp.Write("K");
+      if (progress != null) progress(off * 100 / Math.Max(1, len));
+    }
+    string done = ReadLine(4000);
+    while (done != null && done != "DONE") done = ReadLine(4000);
+    return done == "DONE" ? data : null;
+  }
+
+  // exatamente n bytes (primeiro o que já estava no buffer de linhas)
+  byte[] ReadExact(int n, int timeoutMs) {
+    var until = DateTime.Now.AddMilliseconds(timeoutMs);
+    while (rx.Count < n) {
+      int avail = sp.BytesToRead;
+      if (avail > 0) {
+        var buf = new byte[avail];
+        int got = sp.Read(buf, 0, avail);
+        for (int i = 0; i < got; i++) rx.Add(buf[i]);
+        until = DateTime.Now.AddMilliseconds(timeoutMs);
+      } else {
+        if (DateTime.Now > until) return null;
+        Thread.Sleep(1);
+      }
+    }
+    byte[] r = rx.GetRange(0, n).ToArray();
+    rx.RemoveRange(0, n);
+    return r;
   }
 
   public void Close() {
@@ -487,7 +611,7 @@ public static class Web {
 // do NEXLauncher ou .png, convertido aqui). Instalar = copiar para /apps/<id>.bin e /apps/<id>.icn no cartão.
 public class AppPackage {
   public string Id, Name, Version, File;
-  public byte[] Bin, Icn;
+  public byte[] Bin, Icn, Pc;  // Pc = módulo do HUB (.dll), vai para /apps/<id>.dll no cartão
   public Bitmap Preview;
 
   public static AppPackage Load(string file) {
@@ -506,6 +630,7 @@ public class AppPackage {
       p.Name = S("name").Length > 0 ? S("name") : p.Id;
       p.Version = S("version");
       if (!Regex.IsMatch(p.Id, "^[A-Za-z0-9_-]{1,30}$")) throw new Exception("id inválido no manifest.json");
+      if (S("pc").Length > 0) p.Pc = read(S("pc"));  // módulo do HUB (lado PC do app), opcional
       p.Bin = read(S("bin").Length > 0 ? S("bin") : "app.bin");
       if (p.Bin == null || p.Bin.Length < 1024 || p.Bin[0] != 0xE9) throw new Exception("o pacote não tem um app ESP32 válido");
       string icon = S("icon");
@@ -572,16 +697,95 @@ public abstract class HubApp {
 }
 
 // Lista de módulos. A versão pública traz o exemplo HelloPc; quem compila o HUB com apps próprios
-// acrescenta os módulos em RegisterApps (outra parte desta classe, em outro arquivo).
+// acrescenta os módulos em RegisterApps (outra parte desta classe, em outro arquivo). Módulos também
+// vêm em .dll (%APPDATA%\NEXDECK HUB\modulos): o HUB copia do cartão (/apps/<id>.dll) quando a placa
+// conecta, então quem tem o cartão não precisa instalar nada além do HUB.
 public static partial class HubApps {
   public static readonly List<HubApp> All = new List<HubApp>();
   static partial void RegisterApps(List<HubApp> list);
   static HubApps() {
     RegisterApps(All);
     All.Add(new HelloPcApp());
+    Modules.LoadAll(All);
   }
   public static HubApp ByHello(string hello) { return All.FirstOrDefault(a => a.Hello == hello); }
   public static HubApp ById(string id) { return All.FirstOrDefault(a => a.Id == id); }
+}
+
+// ============================================================================ módulos em .dll
+// Cada app pode trazer o lado PC num .dll (compilado com -r:NEXDECKHub.exe) com classes que estendem
+// HubApp. Ficam em %APPDATA%\NEXDECK HUB\modulos\<id>.dll; carregados dos bytes (o arquivo fica livre
+// para ser trocado). Um módulo novo entra na hora; a versão nova de um módulo já carregado pede reiniciar.
+public static class Modules {
+  public static string Dir { get { return Path.Combine(Config.Dir, "modulos"); } }
+  static readonly Dictionary<string, uint> loaded = new Dictionary<string, uint>(StringComparer.OrdinalIgnoreCase);  // arquivo → crc
+
+  static Modules() {
+    // os .dll procuram o "NEXDECKHub" (o próprio .exe, com qualquer nome de arquivo)
+    AppDomain.CurrentDomain.AssemblyResolve += (s, e) => {
+      var self = typeof(Modules).Assembly;
+      return new System.Reflection.AssemblyName(e.Name).Name == self.GetName().Name ? self : null;
+    };
+  }
+
+  public static uint Crc32(byte[] d) {
+    uint[] t = new uint[256];
+    for (uint i = 0; i < 256; i++) { uint c = i; for (int k = 0; k < 8; k++) c = (c & 1) != 0 ? 0xEDB88320u ^ (c >> 1) : c >> 1; t[i] = c; }
+    uint crc = 0xFFFFFFFFu;
+    foreach (byte b in d) crc = t[(crc ^ b) & 255] ^ (crc >> 8);
+    return ~crc;
+  }
+
+  // módulos do arquivo (não liga ao Worker; quem chama faz isso)
+  static List<HubApp> Instantiate(byte[] dll, string file) {
+    var list = new List<HubApp>();
+    var asm = System.Reflection.Assembly.Load(dll);
+    foreach (var t in asm.GetTypes())
+      if (typeof(HubApp).IsAssignableFrom(t) && !t.IsAbstract && t.GetConstructor(Type.EmptyTypes) != null)
+        list.Add((HubApp)Activator.CreateInstance(t));
+    return list;
+  }
+
+  public static void LoadAll(List<HubApp> all) {
+    try {
+      if (!Directory.Exists(Dir)) return;
+      foreach (string f in Directory.GetFiles(Dir, "*.dll").OrderBy(x => x)) {
+        try {
+          byte[] dll = File.ReadAllBytes(f);
+          loaded[Path.GetFileName(f)] = Crc32(dll);
+          foreach (var m in Instantiate(dll, f)) {
+            if (all.Any(a => a.Id == m.Id)) { Log.Write("módulo " + m.Id + " (" + Path.GetFileName(f) + "): já existe, ignorado"); continue; }
+            all.Add(m);
+            Log.Write("módulo " + m.Id + " carregado de " + Path.GetFileName(f));
+          }
+        } catch (Exception e) { Log.Write("módulo " + Path.GetFileName(f) + ": " + e.Message); }
+      }
+    } catch (Exception e) { Log.Write("módulos: " + e.Message); }
+  }
+
+  public static bool Has(string file, uint crc) {
+    uint c;
+    if (loaded.TryGetValue(file, out c)) return c == crc;
+    string p = Path.Combine(Dir, file);
+    return File.Exists(p) && Crc32(File.ReadAllBytes(p)) == crc;
+  }
+
+  // grava e carrega um módulo; devolve true se precisa reiniciar o HUB (havia outra versão carregada)
+  public static bool Install(string file, byte[] dll, Worker w) {
+    Directory.CreateDirectory(Dir);
+    File.WriteAllBytes(Path.Combine(Dir, file), dll);
+    uint crc = Crc32(dll);
+    if (loaded.ContainsKey(file)) { Log.Write("módulo " + file + ": versão nova, o HUB vai reiniciar"); return true; }
+    loaded[file] = crc;
+    foreach (var m in Instantiate(dll, file)) {
+      if (HubApps.All.Any(a => a.Id == m.Id)) continue;
+      m.W = w;
+      lock (HubApps.All) HubApps.All.Add(m);
+      try { m.Start(); } catch (Exception e) { Log.Write(m.Id + ": " + e.Message); }
+      Log.Write("módulo " + m.Id + " instalado de " + file);
+    }
+    return false;
+  }
 }
 
 // fotos para os apps que mostram fotos do PC: de uma pasta (aleatórias) ou da internet (picsum.photos)
@@ -684,6 +888,10 @@ public class Worker {
       } else {
         ok = link.SendFile("/apps/" + p.Id + ".bin", p.Bin, prog) && (p.Icn == null || link.SendFile("/apps/" + p.Id + ".icn", p.Icn, null));
       }
+      if (ok && p.Pc != null) {  // lado PC: no cartão (para outros PCs) e já aqui
+        ok = PutFile("/apps/" + p.Id + ".dll", p.Pc, null);
+        if (ok && Modules.Install(p.Id + ".dll", p.Pc, this)) restartPending = true;
+      }
       if (ok) {
         try {
           Directory.CreateDirectory(Path.Combine(Config.Dir, "icones"));
@@ -693,7 +901,53 @@ public class Worker {
       Log.Write("instalar " + p.Id + ": " + (ok ? "ok" : "falhou"));
       SetInstall(ok ? 100 : -2, ok ? p.Name + " foi instalado na placa." : "Não deu para instalar. Confira o cabo e tente de novo.");
       RefreshApps();
+      AppsUpdated();
     });
+  }
+
+  // ---- cartão → PC: módulos (.dll) e ícones (.icn) dos apps do cartão
+  bool restartPending;
+  public event Action RestartNeeded;  // a janela reabre o HUB (módulo novo de um app que já estava carregado)
+  readonly HashSet<string> cardChecked = new HashSet<string>();  // "modo" já sincronizado nesta execução
+
+  void AppsUpdated() {
+    if (restartPending) { restartPending = false; var r = RestartNeeded; if (r != null) r(); return; }
+    var h = AppsChanged;
+    if (h != null) h();
+  }
+
+  // na primeira conexão em cada modo (NEXLauncher / app): copia o que falta do cartão
+  void SyncCard() {
+    string key = link.Mode == BoardMode.Launcher ? "launcher" : "app:" + link.HelloName;
+    if (cardChecked.Contains(key)) return;
+    cardChecked.Add(key);
+    var dlls = link.ListFiles("/apps", ".dll");
+    if (dlls == null) { Log.Write("cartão: esta versão da placa não lista arquivos (" + key + ")"); return; }
+    bool changed = false;
+    foreach (var f in dlls) {
+      if (Modules.Has(f.Name, f.Crc)) continue;
+      SetStatus("Instalando " + Path.GetFileNameWithoutExtension(f.Name) + " do cartão...");
+      byte[] dll = link.GetFile("/apps/" + f.Name, null);
+      if (dll == null || Modules.Crc32(dll) != f.Crc) { Log.Write("cartão: não deu para ler " + f.Name); continue; }
+      try {
+        if (Modules.Install(f.Name, dll, this)) restartPending = true;
+        changed = true;
+      } catch (Exception e) { Log.Write("cartão: módulo " + f.Name + ": " + e.Message); }
+    }
+    var icns = link.ListFiles("/apps", ".icn");
+    if (icns != null)
+      foreach (var f in icns) {
+        string id = Path.GetFileNameWithoutExtension(f.Name), png = Path.Combine(Config.Dir, "icones", id + ".png");
+        if (File.Exists(png)) continue;
+        byte[] icn = link.GetFile("/apps/" + f.Name, null);
+        if (icn == null || icn.Length < 6 || Encoding.ASCII.GetString(icn, 0, 4) != "ICN1") continue;
+        try {
+          Directory.CreateDirectory(Path.GetDirectoryName(png));
+          using (var b = AppPackage.IcnToBitmap(icn)) b.Save(png, ImageFormat.Png);
+          changed = true;
+        } catch { }
+      }
+    if (changed) { Log.Write("cartão: apps do cartão instalados no PC"); AppsUpdated(); }
   }
 
   // grava arquivos no cartão (com a placa em qualquer app que use SquareLink, ou no NEXLauncher)
@@ -769,11 +1023,14 @@ public class Worker {
       if (!link.Open) {
         Current = null;
         if (!link.Connect(Cfg.Port)) {
+          if (!link.SawPort) cardChecked.Clear();  // placa desconectada: outro cartão pode chegar
           SetStatus(link.SawPort ? "Placa em outro app (sem conversa com o PC)" : "Procurando a placa...");
           Thread.Sleep(3000);
           continue;
         }
         if (link.Mode == BoardMode.Launcher) {  // NEXLauncher aberto: lista, atende pedidos e tenta de novo (pode abrir um app)
+          SetStatus("Placa no NEXLauncher");
+          try { SyncCard(); } catch (Exception e) { Log.Write("cartão: " + e.Message); }
           SetStatus("Placa no NEXLauncher");
           RefreshApps();
           var until = DateTime.Now.AddSeconds(4);
@@ -783,6 +1040,7 @@ public class Worker {
         }
         try {
           hello = link.Hello.Split('\t');
+          SyncCard();  // antes de escolher o módulo: ele pode estar chegando do cartão agora
           Current = HubApps.ByHello(link.HelloName);
           lock (blobs) blobs.Clear();
           SetStatus(Current != null ? Current.Status : link.HelloName + " aberto na placa");
@@ -957,9 +1215,14 @@ public static class Program {
     if (args.Length == 1 && args[0] == "--guard") { Guard.Run(); return; }
     if (args.Length == 2 && args[0] == "--shots") { HubForm.Shots(args[1]); return; }
     if (args.Length == 2 && args[0] == "--pack") { File.WriteAllText(args[1] + ".txt", AppPackage.Load(args[1]).Name); return; }
+    if (args.Length >= 1 && args[0] == "--desinstalar") { Setup.Uninstall(args.Length > 1 && args[1] == "/s"); return; }  // /s = sem perguntas
+    if (args.Length == 0 && Setup.IsInstaller) { Setup.Install(); return; }  // "Instalar NEXDECK HUB.exe"
     string reason = args.Length == 1 ? args[0] : "";
     bool first;
     using (var m = new Mutex(true, "NEXDECKHub.PC", out first)) {
+      if (!first && reason.StartsWith("--reiniciar")) {  // a cópia antiga ainda está fechando
+        try { first = m.WaitOne(20000); } catch (AbandonedMutexException) { first = true; }
+      }
       if (!first) {
         if (reason == "") TrayApp.SignalOpen();  // já está aberto: mostra a janela dele
         return;
