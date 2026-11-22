@@ -1,0 +1,7 @@
+firmware/build/
+dist/
+hub/*.exe
+*.pdb
+__pycache__/
+.qrcheck/
+firmware/templates/*/build/

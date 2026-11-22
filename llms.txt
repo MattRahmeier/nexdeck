@@ -1,0 +1,23 @@
+# NEXDECK
+
+> App platform for the Guition ESP32-4848S040 (ESP32-S3, 480x480 RGB touch display, microSD) and NEXDECK HUB, its Windows companion app (C# 5, .NET Framework 4). The NEXDECK launcher installs apps from the SD card; apps use the SquareBoard Arduino library; apps that talk to the PC use a checksummed serial protocol and have a HUB module (the app's PC side).
+
+## Start here
+- [AGENTS.md](AGENTS.md): rules and commands for AI coding agents
+- [Getting started](docs/getting-started.md): toolchain, flashing the launcher, first app, installing apps
+
+## Reference
+- [Architecture](docs/architecture.md): partitions (app0 launcher, app1 app), boot flow, HUB core and modules
+- [Library](docs/library.md): sq:: board API, Canvas drawing, fonts, SquareLauncher.h, SquareLink.h
+- [Protocol](docs/protocol.md): 460800 app dialect (lines + K/E, EV events, blocks, LS/FPUT/RM/OPENAPP), 921600 launcher dialect
+- [HUB modules](docs/hub-modules.md): HubApp lifecycle, AppPage UI, components, utilities (QrCode, PhotoSource, Txt.Clean)
+- [App packages](docs/app-package.md): .nexapp zip and .icn icon format
+- [Design guide](docs/design-guide.md): slate palette, layout, touch, icons, loading states
+- [Hardware](docs/hardware.md): pins and quirks
+
+## Code
+- [Library headers](firmware/libraries/SquareBoard/src): SquareBoard.h, sq_gfx.h, sq_fonts.h, SquareLauncher.h, SquareLink.h
+- [Template: standalone app](firmware/templates/hello_app/hello_app.ino)
+- [Template: app that talks to the PC](firmware/templates/hello_pc/hello_pc.ino)
+- [HUB sample module](hub/NexDeckHub.Sample.cs)
+- [Launcher](firmware/launcher/launcher.ino)
