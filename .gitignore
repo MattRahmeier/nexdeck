@@ -5,3 +5,4 @@ hub/*.exe
 __pycache__/
 .qrcheck/
 firmware/templates/*/build/
+firmware/*/build/
