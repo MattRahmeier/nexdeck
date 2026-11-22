@@ -3,7 +3,7 @@
 Formato .nexapp: um .zip com
   manifest.json  {"id": "hello_pc", "name": "Hello PC", "version": "1.0", "bin": "app.bin", "icon": "icon.icn"}
   app.bin        o firmware do app (o mesmo .bin que vai para /apps no cartão)
-  icon.icn       ícone 88×88 do NEXDECK (ou icon.png, que o HUB converte)
+  icon.icn       ícone 88×88 do NEXLauncher (ou icon.png, que o HUB converte)
 O HUB grava /apps/<id>.bin e /apps/<id>.icn no cartão.
 
 Uso: python -I tools/make_nexapp.py <sketch dir> <id> "<nome>" <versão>

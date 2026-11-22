@@ -5,7 +5,7 @@ USB serial (CH340). Two dialects:
 | Who is running on the board | Baud | Framing |
 |---|---|---|
 | an **app** that talks to the PC | **460800** | checksummed lines, `K`/`E` answers, checksummed blocks |
-| the **NEXDECK launcher** | **921600** | plain text commands (for tools and the HUB) |
+| the **NEXLauncher** | **921600** | plain text commands (for tools and the HUB) |
 
 Open the port with **DTR and RTS low** (otherwise the board may reset).
 

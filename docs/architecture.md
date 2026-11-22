@@ -2,7 +2,7 @@
 
 ```
  ┌───────────────────────── board (ESP32-S3) ─────────────────────────┐        ┌──────────── PC (Windows) ────────────┐
- │ flash app0: NEXDECK launcher   flash app1: the app being used        │  USB   │ NEXDECK HUB (tray)                    │
+ │ flash app0: NEXLauncher        flash app1: the app being used        │  USB   │ NEXDECK HUB (tray)                    │
  │ microSD: /apps/<id>.bin + <id>.icn, app data (/<anything>)           │◀──────▶│  core: find board, list/install/open │
  │ SquareBoard library: display, touch, SD, Canvas, fonts, link        │ serial │  modules: PC side of each app        │
  └──────────────────────────────────────────────────────────────────────┘        └──────────────────────────────────────┘
@@ -12,7 +12,7 @@
 
 Partition scheme `app3M_fat9M_16MB`: two 3 MB app slots (`app0`, `app1`) and a FAT area.
 
-- **`app0` = NEXDECK launcher**, flashed once over USB. It lists `/apps/*.bin` on the SD card.
+- **`app0` = NEXLauncher**, flashed once over USB. It lists `/apps/*.bin` on the SD card.
 - **`app1` = the installed app.** Tapping an icon copies that `.bin` into `app1` with the ESP-IDF `Update`
   API (only when the file changed: name + size are remembered in NVS), sets `app1` as the boot partition and
   restarts.

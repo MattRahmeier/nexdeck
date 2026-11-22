@@ -1,5 +1,5 @@
 // NEXDECK HUB — núcleo (público): app de bandeja do Windows que acompanha a placa NEXDECK pela USB.
-// Acha a placa (no NEXDECK ou num app), mostra os apps do cartão, instala apps (.nexapp), abre apps na
+// Acha a placa (no NEXLauncher ou num app), mostra os apps do cartão, instala apps (.nexapp), abre apps na
 // placa e entrega a conversa com cada app ao módulo dele (HubApp). Os módulos ficam em outros arquivos
 // (NexDeckHub.Sample.cs é o exemplo). Compilar com build.ps1 (csc do .NET Framework 4, C# 5).
 // Documentação: docs/ (hub-modules.md, protocol.md).
@@ -136,13 +136,13 @@ public static class Txt {
 }
 
 // ============================================================================ ligação com a placa
-// None = sem placa; Launcher = NEXDECK aberto (921600 baud); App = um app que fala com o PC (460800)
+// None = sem placa; Launcher = NEXLauncher aberto (921600 baud); App = um app que fala com o PC (460800)
 public enum BoardMode { None, Launcher, App }
 
 public class Link {
   SerialPort sp;
   public BoardMode Mode = BoardMode.None;
-  public List<string> LauncherApps = new List<string>();  // "nome bytes" da última listagem do NEXDECK
+  public List<string> LauncherApps = new List<string>();  // "nome bytes" da última listagem do NEXLauncher
   readonly List<byte> rx = new List<byte>();
   public readonly Queue<string> Events = new Queue<string>();
   public bool Open { get { return sp != null && sp.IsOpen; } }
@@ -200,7 +200,7 @@ public class Link {
         }
       } catch { }
       Close();
-      // nenhum app respondeu: talvez a placa esteja no NEXDECK (lançador, 921600 baud)
+      // nenhum app respondeu: talvez a placa esteja no NEXLauncher (lançador, 921600 baud)
       try {
         sp = new SerialPort(port, 921600, Parity.None, 8, StopBits.One) { DtrEnable = false, RtsEnable = false, ReadTimeout = 50, WriteTimeout = 2000 };
         sp.Open();
@@ -218,7 +218,7 @@ public class Link {
 
   public string Hello = "";  // a linha EV HELLO inteira
 
-  // ---- NEXDECK (lançador): comandos de texto, sem soma
+  // ---- NEXLauncher (lançador): comandos de texto, sem soma
   public bool LauncherList() {
     sp.Write("LS\n");
     var list = new List<string>();
@@ -484,7 +484,7 @@ public static class Web {
 
 // ============================================================================ pacote de app (.nexapp)
 // Um .zip com manifest.json ({"id", "name", "version", "bin", "icon"}), o .bin do app e o ícone (.icn
-// do NEXDECK ou .png, convertido aqui). Instalar = copiar para /apps/<id>.bin e /apps/<id>.icn no cartão.
+// do NEXLauncher ou .png, convertido aqui). Instalar = copiar para /apps/<id>.bin e /apps/<id>.icn no cartão.
 public class AppPackage {
   public string Id, Name, Version, File;
   public byte[] Bin, Icn;
@@ -696,19 +696,19 @@ public class Worker {
     });
   }
 
-  // grava arquivos no cartão (com a placa em qualquer app que use SquareLink, ou no NEXDECK)
+  // grava arquivos no cartão (com a placa em qualquer app que use SquareLink, ou no NEXLauncher)
   public bool PutFile(string path, byte[] data, Action<int> progress) {
     if (link.Mode == BoardMode.Launcher) return link.LauncherPut(path, data, progress);
     if (link.Mode == BoardMode.App) return link.SendFile(path, data, progress);
     return false;
   }
 
-  // fecha o app aberto e volta ao NEXDECK (OPENAPP sem nome: o lançador não abre nada)
+  // fecha o app aberto e volta ao NEXLauncher (OPENAPP sem nome: o lançador não abre nada)
   public void ReturnToLauncher() {
     Request(() => {
       if (link.Mode != BoardMode.App) return;
       Must(link.Send("OPENAPP	"));
-      link.Close();  // a placa reinicia no NEXDECK
+      link.Close();  // a placa reinicia no NEXLauncher
     });
   }
 
@@ -773,8 +773,8 @@ public class Worker {
           Thread.Sleep(3000);
           continue;
         }
-        if (link.Mode == BoardMode.Launcher) {  // NEXDECK aberto: lista, atende pedidos e tenta de novo (pode abrir um app)
-          SetStatus("Placa no NEXDECK");
+        if (link.Mode == BoardMode.Launcher) {  // NEXLauncher aberto: lista, atende pedidos e tenta de novo (pode abrir um app)
+          SetStatus("Placa no NEXLauncher");
           RefreshApps();
           var until = DateTime.Now.AddSeconds(4);
           while (DateTime.Now < until && !Stop) { try { RunRequests(); } catch (Exception e) { Log.Write("pedido: " + e.Message); } Thread.Sleep(100); }

@@ -564,7 +564,7 @@ public class AppCard : Card {
     var ir = new RectangleF(53, 88, 104, 104);
     using (var sh = Theme.Round(new RectangleF(ir.X + 2, ir.Y + 8, ir.Width - 4, ir.Height - 4), 24))
     using (var br = new PathGradientBrush(sh) { CenterColor = Color.FromArgb(70, 0, 0, 0), SurroundColors = new[] { Color.FromArgb(0, 0, 0, 0) } })
-      g.FillPath(br, sh);  // sombra: o ícone "flutua", como no NEXDECK
+      g.FillPath(br, sh);  // sombra: o ícone "flutua", como no NEXLauncher
     if (Picture != null) {
       g.InterpolationMode = InterpolationMode.HighQualityBicubic;
       g.DrawImage(Picture, ir);
@@ -738,7 +738,7 @@ public class InstallDialog : Form {
     bool busy = !go.Enabled;
     if (!busy) {
       go.Enabled = worker.Connected;
-      msg.Text = worker.Connected ? "Vai para o cartão da placa e aparece no NEXDECK." : "Conecte a placa pela USB para instalar.";
+      msg.Text = worker.Connected ? "Vai para o cartão da placa e aparece no NEXLauncher." : "Conecte a placa pela USB para instalar.";
       return;
     }
     if (worker.InstallPct >= 0) bar.Value = worker.InstallPct;
@@ -1020,12 +1020,12 @@ public class HubForm : Form {
         // app com configurações: abre a página dele; sem configurações: pergunta se abre na placa
         if (card.Configurable) card.Activated += () => ShowApp(module);
         else card.Activated += () => { if (worker.Mode != BoardMode.None && Ask.YesNo(this, "Deseja abrir esse app na placa?", card.Picture)) worker.OpenApp(name); };
-        if (card.Running) {  // aberto agora: configurações (se tiver) e parar (volta ao NEXDECK da placa)
+        if (card.Running) {  // aberto agora: configurações (se tiver) e parar (volta ao NEXLauncher da placa)
           var stop = card.Configurable ? card.Settings : card.Action;
           stop.Glyph = "stop";
-          stop.Click += (s, e) => { if (Ask.YesNo(this, "Fechar " + Theme.AppLabel(name) + " e voltar ao NEXDECK na placa?", card.Picture)) worker.ReturnToLauncher(); };
+          stop.Click += (s, e) => { if (Ask.YesNo(this, "Fechar " + Theme.AppLabel(name) + " e voltar ao NEXLauncher na placa?", card.Picture)) worker.ReturnToLauncher(); };
           stop.Visible = true;
-          new ToolTip().SetToolTip(stop, "Fechar e voltar ao NEXDECK");
+          new ToolTip().SetToolTip(stop, "Fechar e voltar ao NEXLauncher");
           if (card.Configurable) {
             card.Action.Glyph = "gear";
             card.Action.Primary = true;
@@ -1090,7 +1090,7 @@ public class HubForm : Form {
   void Tick() {
     var mode = worker.Mode;
     string app = worker.Current != null ? worker.Current.Title : Theme.AppLabel(worker.RunningApp ?? "");
-    boardChip.Text = mode == BoardMode.App ? "Placa conectada · " + app : mode == BoardMode.Launcher ? "Placa conectada · NEXDECK"
+    boardChip.Text = mode == BoardMode.App ? "Placa conectada · " + app : mode == BoardMode.Launcher ? "Placa conectada · NEXLauncher"
                    : (worker.Status.StartsWith("Pausado") ? "Pausado" : worker.Status.StartsWith("Placa em outro") ? "Placa em outro app" : "Procurando a placa");
     var list = worker.Apps;
     appsSub.Text = list == null ? (worker.Connected ? "" : (string.IsNullOrEmpty(cfg.LastApps) ? " " : "Placa desconectada · última lista"))

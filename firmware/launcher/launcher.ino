@@ -1,4 +1,4 @@
-// NEXDECK — lançador de apps (e nome do projeto). Fica gravado na partição app0 (pela USB); toda vez
+// NEXLauncher — lançador de apps do NEXDECK. Fica gravado na partição app0 (pela USB); toda vez
 // que a placa liga abre a tela de boas-vindas e depois mostra os arquivos .bin da pasta /apps
 // do cartão SD. Tocar num app grava ele na partição app1
 // (só na primeira vez ou se o arquivo mudou) e reinicia nele. O app volta para cá com
@@ -182,7 +182,7 @@ void drawMenu() {
   c.setView({0, 0, SCREEN_W, SCREEN_H, false});
   c.clear(PANEL);
   deckMark(c, 40, 37, 28);
-  c.text(FONT_MED, 64, 18, "NEXDECK", WHITE);
+  c.text(FONT_MED, 64, 18, "NEXLauncher", WHITE);
   char count[16];
   snprintf(count, sizeof count, appCount == 1 ? "1 app" : "%d apps", appCount);
   c.text(FONT_SMALL, 456, 24, count, FAINT, RIGHT);

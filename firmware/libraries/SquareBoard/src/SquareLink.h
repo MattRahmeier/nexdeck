@@ -4,7 +4,7 @@
 // Blocos de dados (imagens, arquivos): até 2048 bytes + 2 bytes de soma, resposta K ou R (reenviar).
 // Comandos de cartão que todo app atende (o HUB usa para listar e instalar apps):
 //   LS → EV APPS nome,bytes;...   FPUT\t<caminho>\t<bytes> → OK, blocos, DONE   RM\t<caminho>
-//   OPENAPP\t<nome> → volta ao NEXDECK, que abre o app na hora
+//   OPENAPP\t<nome> → volta ao NEXLauncher, que abre o app na hora
 #include <Arduino.h>
 #include <Preferences.h>
 #include <SD.h>
@@ -108,7 +108,7 @@ inline void receiveFile(const char* path, uint32_t len) {
 }
 
 // LS, FPUT, RM e OPENAPP; devolve true se a linha era um deles (já respondida).
-// beforeLeave: o app apaga a tela/fecha o cartão antes de voltar ao NEXDECK
+// beforeLeave: o app apaga a tela/fecha o cartão antes de voltar ao NEXLauncher
 template <typename F>
 bool common(char* s, bool sdOk, F beforeLeave) {
   if (!strcmp(s, "LS")) { if (sdOk) listApps(); Serial.println("K"); return true; }

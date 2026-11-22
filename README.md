@@ -3,7 +3,7 @@
 **An app platform for the Guition ESP32-4848S040** — the 4" square 480×480 touch board — **plus NEXDECK HUB,
 its Windows companion app.**
 
-- **NEXDECK launcher** lives in the board's flash and installs apps from the microSD card (`/apps/*.bin`),
+- **NEXLauncher** (the NEXDECK app launcher) lives in the board's flash and installs apps from the microSD card (`/apps/*.bin`),
   with a welcome screen, floating icons and fast switching between apps.
 - **SquareBoard library**: display, touch, SD, an anti-aliased drawing canvas, bitmap fonts (Barlow), launcher
   helpers and the serial protocol to talk to the PC.
@@ -38,7 +38,7 @@ its Windows companion app.**
 | Path | What it is |
 |---|---|
 | `firmware/libraries/SquareBoard` | Core Arduino library (`SquareBoard.h`, `sq_gfx.h`, `sq_fonts.h`, `SquareLauncher.h`, `SquareLink.h`) |
-| `firmware/launcher` | NEXDECK launcher (flashed to partition `app0`) |
+| `firmware/launcher` | NEXLauncher (flashed to partition `app0`) |
 | `firmware/templates/hello_app` | Smallest standalone app: draw, touch, back to the launcher |
 | `firmware/templates/hello_pc` | App that talks to the PC (pairs with `hub/NexDeckHub.Sample.cs`) |
 | `hub/` | NEXDECK HUB: core, window/components, QR encoder, sample module, `build.ps1` |

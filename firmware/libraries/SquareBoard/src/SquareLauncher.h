@@ -1,7 +1,7 @@
 #pragma once
-// NEXDECK (o projeto e o seu lançador): o menu fica fixo na partição "app0" e o app escolhido
+// NEXLauncher (o lançador de apps do NEXDECK): o menu fica fixo na partição "app0" e o app escolhido
 // é instalado do cartão SD na "app1". Um app volta ao menu chamando sqReturnToLauncher().
-// Toda vez que a placa liga, abre a tela de boas-vindas do NEXDECK: o lançador marca a app1 só
+// Toda vez que a placa liga, abre a tela de boas-vindas do NEXDECK (no NEXLauncher): o lançador marca a app1 só
 // para o reinício que abre o app, e o app, ao começar, chama sqBootLauncherNext() para que o
 // próximo boot (desligar e ligar, botão reset) volte ao lançador.
 // Só depende do ESP-IDF, então qualquer sketch pode incluir este arquivo.
@@ -26,7 +26,7 @@ inline bool sqSetBoot(esp_partition_subtype_t sub) {
   return esp_ota_set_boot_partition(p) == ESP_OK;
 }
 
-// Chamar no começo do app: o próximo boot abre o NEXDECK.
+// Chamar no começo do app: o próximo boot abre o NEXLauncher.
 inline void sqBootLauncherNext() {
   if (sqLauncherAvailable()) sqSetBoot(ESP_PARTITION_SUBTYPE_APP_OTA_0);
 }

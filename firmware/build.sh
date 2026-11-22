@@ -1,7 +1,7 @@
 #!/bin/sh
 # Builds NEXDECK sketches with arduino-cli (ESP32 core 3.3.x) and optionally flashes over USB.
 #   sh firmware/build.sh                          build the launcher and the templates
-#   sh firmware/build.sh launcher COM3            build and flash the NEXDECK launcher (partition app0)
+#   sh firmware/build.sh launcher COM3            build and flash the NEXLauncher (partition app0)
 #   sh firmware/build.sh templates/hello_app      build one sketch; the .bin goes to firmware/build/<name>/
 #   sh firmware/build.sh path/to/my_app           build your own app (folder name = .ino name)
 # Apps go to the SD card as /apps/<name>.bin: tools/make_nexapp.py + NEXDECK HUB, or tools/push.ps1.

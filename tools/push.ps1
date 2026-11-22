@@ -1,4 +1,4 @@
-﻿# Manda arquivos para o cartão SD da placa pela USB, com o NEXDECK (lançador) aberto na tela.
+﻿# Manda arquivos para o cartão SD da placa pela USB, com o NEXLauncher (lançador) aberto na tela.
 #   powershell -File tools\push.ps1 -File firmware\build\hello_app\hello_app.ino.bin -Dest /apps/hello_app.bin
 #   powershell -File tools\push.ps1 -File minha.jpg -Dest /imagens/minha.jpg
 #   powershell -File tools\push.ps1 -Run hello_app      (abre o app, como um toque no menu)

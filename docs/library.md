@@ -7,7 +7,7 @@
 | `SquareBoard.h` | board bring-up: display, back buffer, flush, backlight, touch, SD |
 | `sq_gfx.h` | `Canvas` drawing (portable C++, also compiles on a PC) |
 | `sq_fonts.h` | bitmap fonts (`FONT_*`) |
-| `SquareLauncher.h` | NEXDECK launcher helpers (boot partition, return to launcher, backlight hold) |
+| `SquareLauncher.h` | NEXLauncher helpers (boot partition, return to launcher, backlight hold) |
 | `SquareLink.h` | PC protocol helpers (`sqlink::`): checksum, blocks, SD commands |
 
 ## `sq::` (SquareBoard.h)

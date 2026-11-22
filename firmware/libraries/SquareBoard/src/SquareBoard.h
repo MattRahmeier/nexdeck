@@ -1,6 +1,6 @@
 #pragma once
 // Placa Guition ESP32-4848S040: tela 480×480 (ST7701 RGB), toque GT911, microSD e luz de fundo.
-// Usado pelo NEXDECK (lançador) e pelos apps. API: docs/library.md.
+// Usado pelo NEXLauncher (lançador) e pelos apps. API: docs/library.md.
 #include <Arduino.h>
 #include "sq_gfx.h"
 

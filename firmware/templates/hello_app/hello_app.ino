@@ -1,10 +1,10 @@
 // hello_app — minimal NEXDECK app template (no PC needed).
-// Shows the essentials: start the board, draw with Canvas, read touch, return to the NEXDECK launcher.
+// Shows the essentials: start the board, draw with Canvas, read touch, return to the NEXLauncher.
 // Copy this folder, rename it (folder name = .ino name = app id), build with firmware/build.sh and
 // install it with tools/make_nexapp.py + NEXDECK HUB (or tools/push.ps1). See docs/getting-started.md.
 #include <Arduino.h>
 #include <SquareBoard.h>     // display, touch, SD, Canvas drawing, fonts
-#include <SquareLauncher.h>  // NEXDECK launcher helpers
+#include <SquareLauncher.h>  // NEXLauncher helpers
 
 namespace {
 
