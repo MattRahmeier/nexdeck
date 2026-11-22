@@ -529,6 +529,7 @@ public class AppCard : Card {
   public Image Picture;
   public string Sub = "";
   public readonly FlatButton Action = new FlatButton("");
+  public readonly FlatButton Settings = new FlatButton("") { Glyph = "gear" };  // configurações (app com módulo que não está aberto)
   public event Action Activated;
   public AppCard() {
     Size = new Size(210, 272);
@@ -537,6 +538,9 @@ public class AppCard : Card {
     Action.SetBounds(Width - 58, Height - 58, 40, 40);
     Action.Visible = false;
     Controls.Add(Action);
+    Settings.SetBounds(Width - 106, Height - 58, 40, 40);
+    Settings.Visible = false;
+    Controls.Add(Settings);
     Shimmer.Tick.Tick += (s, e) => { if (Skeleton && Visible) Invalidate(); };
   }
   protected override void OnMouseEnter(EventArgs e) { if (!Skeleton) { Hot = true; Invalidate(); } base.OnMouseEnter(e); }
@@ -1022,6 +1026,11 @@ public class HubForm : Form {
           card.Action.Glyph = "play";
           card.Action.Click += (s, e) => worker.OpenApp(name);
           card.Action.Visible = worker.Mode != BoardMode.None && !card.Running;
+          if (card.Configurable) {  // configurações sem precisar abrir o app na placa
+            card.Settings.Click += (s, e) => ShowApp(module);
+            card.Settings.Visible = true;
+            if (!card.Action.Visible) card.Settings.Left = card.Action.Left;
+          }
         }
         cards.Controls.Add(card);
       }
