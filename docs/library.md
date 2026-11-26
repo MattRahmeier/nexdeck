@@ -31,6 +31,11 @@ Typical loop: poll touch every ~15 ms, update state, redraw only what changed, `
 All coordinates are local to the current `View` (`setView({x, y, w, h, rot180})`); `rot180` draws upside down
 (useful for players sitting across a table). Colors are RGB565: `rgb(r, g, b)` is `constexpr`.
 
+`setClip(Rect)` (screen coordinates) limits every drawing call, `clear` included, to a rectangle; `clearClip()`
+removes it. To update a small moving part of a complex screen (a clock hand, a running number), redraw the whole
+screen with the clip set to the changed rectangle and `flush` only that rectangle: the result is pixel-identical
+to a full redraw, and shapes outside the clip cost almost nothing.
+
 ```cpp
 void clear(uint16_t c);
 void fillRect(int x, int y, int w, int h, uint16_t c);

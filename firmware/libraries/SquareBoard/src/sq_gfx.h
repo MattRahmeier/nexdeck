@@ -41,7 +41,11 @@ class Canvas {
   explicit Canvas(uint16_t* buf) : fb(buf) {}
   uint16_t* fb;
 
-  void setView(const View& v) { view = v; }
+  void setView(const View& v) { view = v; updateBounds(); }
+  // recorte em coordenadas da tela: nada é desenhado fora dele (redesenhar só um pedaço da tela)
+  void setClip(const Rect& r) { clip = r; updateBounds(); }
+  void clearClip() { clip = {0, 0, SCREEN_W, SCREEN_H}; updateBounds(); }
+  const Rect& clipRect() const { return clip; }
   // text slant (italic drawn at runtime, any font): 0 = upright, 0.2 = typical italic
   void setSlant(float s) { slant = s; }
   const View& currentView() const { return view; }
@@ -75,6 +79,9 @@ class Canvas {
 
  private:
   View view{0, 0, SCREEN_W, SCREEN_H, false};
+  Rect clip{0, 0, SCREEN_W, SCREEN_H};
+  int bx0 = 0, by0 = 0, bx1 = SCREEN_W, by1 = SCREEN_H;  // área desenhável em coordenadas locais (vista ∩ recorte)
+  void updateBounds();
   float slant = 0;
   void plot(int lx, int ly, uint16_t c, uint8_t a);
   template <typename F>

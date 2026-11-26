@@ -26,8 +26,20 @@ uint32_t utf8Next(const char*& s) {
   return cp;
 }
 
+void Canvas::updateBounds() {
+  // recorte (tela) → coordenadas locais da vista; com a vista girada os cantos trocam de lugar
+  int ax, ay, bx, by;
+  view.toLocal(clip.x, clip.y, ax, ay);
+  view.toLocal(clip.x + clip.w - 1, clip.y + clip.h - 1, bx, by);
+  int x0 = ax < bx ? ax : bx, x1 = (ax > bx ? ax : bx) + 1, y0 = ay < by ? ay : by, y1 = (ay > by ? ay : by) + 1;
+  bx0 = x0 > 0 ? x0 : 0;
+  by0 = y0 > 0 ? y0 : 0;
+  bx1 = x1 < view.w ? x1 : view.w;
+  by1 = y1 < view.h ? y1 : view.h;
+}
+
 void Canvas::plot(int lx, int ly, uint16_t c, uint8_t a) {
-  if (lx < 0 || ly < 0 || lx >= view.w || ly >= view.h || a == 0) return;
+  if (lx < bx0 || ly < by0 || lx >= bx1 || ly >= by1 || a == 0) return;
   int sx, sy;
   view.toScreen(lx, ly, sx, sy);
   uint16_t& p = fb[sy * SCREEN_W + sx];
@@ -35,14 +47,19 @@ void Canvas::plot(int lx, int ly, uint16_t c, uint8_t a) {
 }
 
 void Canvas::clear(uint16_t c) {
-  for (int i = 0; i < SCREEN_W * SCREEN_H; i++) fb[i] = c;
+  if (clip.x == 0 && clip.y == 0 && clip.w == SCREEN_W && clip.h == SCREEN_H) {
+    for (int i = 0; i < SCREEN_W * SCREEN_H; i++) fb[i] = c;
+    return;
+  }
+  for (int y = clip.y; y < clip.y + clip.h; y++)
+    for (int x = clip.x; x < clip.x + clip.w; x++) fb[y * SCREEN_W + x] = c;
 }
 
 void Canvas::fillRect(int x, int y, int w, int h, uint16_t c) {
-  if (x < 0) { w += x; x = 0; }
-  if (y < 0) { h += y; y = 0; }
-  if (x + w > view.w) w = view.w - x;
-  if (y + h > view.h) h = view.h - y;
+  if (x < bx0) { w -= bx0 - x; x = bx0; }
+  if (y < by0) { h -= by0 - y; y = by0; }
+  if (x + w > bx1) w = bx1 - x;
+  if (y + h > by1) h = by1 - y;
   if (w <= 0 || h <= 0) return;
   // um retângulo continua retângulo após girar 180°
   int sx0, sy0, sx1, sy1;
@@ -66,7 +83,7 @@ void Canvas::frameRect(int x, int y, int w, int h, int t, uint16_t c) {
 void Canvas::dimRect(int x, int y, int w, int h, uint8_t keep) {
   for (int yy = y; yy < y + h; yy++)
     for (int xx = x; xx < x + w; xx++) {
-      if (xx < 0 || yy < 0 || xx >= view.w || yy >= view.h) continue;
+      if (xx < bx0 || yy < by0 || xx >= bx1 || yy >= by1) continue;
       int sx, sy;
       view.toScreen(xx, yy, sx, sy);
       uint16_t& p = fb[sy * SCREEN_W + sx];
@@ -87,7 +104,7 @@ void Canvas::fillGradient(int x, int y, int w, int h, uint16_t c0, uint16_t c1) 
   for (int yy = 0; yy < h; yy++)
     for (int xx = 0; xx < w; xx++) {
       int lx = x + xx, ly = y + yy;
-      if (lx < 0 || ly < 0 || lx >= view.w || ly >= view.h) continue;
+      if (lx < bx0 || ly < by0 || lx >= bx1 || ly >= by1) continue;
       int sx, sy;
       view.toScreen(lx, ly, sx, sy);
       fb[sy * SCREEN_W + sx] = lut[(xx + yy) * 32 / span];
@@ -114,6 +131,11 @@ template <typename F>
 void Canvas::shade(float x0, float y0, float x1, float y1, uint16_t c, F sdf) {
   int ix0 = (int)floorf(x0) - 1, iy0 = (int)floorf(y0) - 1;
   int ix1 = (int)ceilf(x1) + 1, iy1 = (int)ceilf(y1) + 1;
+  // só o que cabe na área desenhável (com recorte pequeno, quase nada é calculado)
+  if (ix0 < bx0) ix0 = bx0;
+  if (iy0 < by0) iy0 = by0;
+  if (ix1 > bx1 - 1) ix1 = bx1 - 1;
+  if (iy1 > by1 - 1) iy1 = by1 - 1;
   for (int y = iy0; y <= iy1; y++)
     for (int x = ix0; x <= ix1; x++) {
       float d = sdf(x + 0.5f, y + 0.5f);
@@ -196,11 +218,11 @@ void Canvas::fillRound(int x, int y, int w, int h, int r, uint16_t c0, uint16_t 
   int span = diag ? (w + h - 2 > 0 ? w + h - 2 : 1) : (h - 1 > 0 ? h - 1 : 1);
   for (int yy = 0; yy < h; yy++) {
     int ly = y + yy;
-    if (ly < 0 || ly >= view.h) continue;
+    if (ly < by0 || ly >= by1) continue;
     float dy = yy < r ? r - (yy + 0.5f) : (yy >= h - r ? (yy + 0.5f) - (h - r) : -1.f);
     for (int xx = 0; xx < w; xx++) {
       int lx = x + xx;
-      if (lx < 0 || lx >= view.w) continue;
+      if (lx < bx0 || lx >= bx1) continue;
       uint16_t c = lut[(diag ? xx + yy : yy) * 32 / span];
       uint8_t a = 255;
       if (dy >= 0) {
@@ -222,10 +244,10 @@ void Canvas::fillRound(int x, int y, int w, int h, int r, uint16_t c0, uint16_t 
 void Canvas::blit(int x, int y, int w, int h, const uint16_t* px, const uint8_t* alpha) {
   for (int yy = 0; yy < h; yy++) {
     int ly = y + yy;
-    if (ly < 0 || ly >= view.h) continue;
+    if (ly < by0 || ly >= by1) continue;
     for (int xx = 0; xx < w; xx++) {
       int lx = x + xx;
-      if (lx < 0 || lx >= view.w) continue;
+      if (lx < bx0 || lx >= bx1) continue;
       uint8_t a = alpha ? alpha[yy * w + xx] : 255;
       if (!a) continue;
       int sx, sy;
